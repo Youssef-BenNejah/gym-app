@@ -9,61 +9,236 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as AppIndexRouteImport } from './routes/_app.index'
+import { Route as AuthSignupRouteImport } from './routes/auth.signup'
+import { Route as AuthLoginRouteImport } from './routes/auth.login'
+import { Route as AppProgressRouteImport } from './routes/_app.progress'
+import { Route as AppProfileRouteImport } from './routes/_app.profile'
+import { Route as AppMealsRouteImport } from './routes/_app.meals'
+import { Route as AppLogRouteImport } from './routes/_app.log'
+import { Route as AppMealsNewRouteImport } from './routes/_app.meals.new'
 
-const IndexRoute = IndexRouteImport.update({
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AuthSignupRoute = AuthSignupRouteImport.update({
+  id: '/auth/signup',
+  path: '/auth/signup',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthLoginRoute = AuthLoginRouteImport.update({
+  id: '/auth/login',
+  path: '/auth/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppProgressRoute = AppProgressRouteImport.update({
+  id: '/progress',
+  path: '/progress',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProfileRoute = AppProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMealsRoute = AppMealsRouteImport.update({
+  id: '/meals',
+  path: '/meals',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLogRoute = AppLogRouteImport.update({
+  id: '/log',
+  path: '/log',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMealsNewRoute = AppMealsNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => AppMealsRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AppIndexRoute
+  '/log': typeof AppLogRoute
+  '/meals': typeof AppMealsRouteWithChildren
+  '/profile': typeof AppProfileRoute
+  '/progress': typeof AppProgressRoute
+  '/auth/login': typeof AuthLoginRoute
+  '/auth/signup': typeof AuthSignupRoute
+  '/meals/new': typeof AppMealsNewRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/log': typeof AppLogRoute
+  '/meals': typeof AppMealsRouteWithChildren
+  '/profile': typeof AppProfileRoute
+  '/progress': typeof AppProgressRoute
+  '/auth/login': typeof AuthLoginRoute
+  '/auth/signup': typeof AuthSignupRoute
+  '/': typeof AppIndexRoute
+  '/meals/new': typeof AppMealsNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/_app/log': typeof AppLogRoute
+  '/_app/meals': typeof AppMealsRouteWithChildren
+  '/_app/profile': typeof AppProfileRoute
+  '/_app/progress': typeof AppProgressRoute
+  '/auth/login': typeof AuthLoginRoute
+  '/auth/signup': typeof AuthSignupRoute
+  '/_app/': typeof AppIndexRoute
+  '/_app/meals/new': typeof AppMealsNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/log'
+    | '/meals'
+    | '/profile'
+    | '/progress'
+    | '/auth/login'
+    | '/auth/signup'
+    | '/meals/new'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/log'
+    | '/meals'
+    | '/profile'
+    | '/progress'
+    | '/auth/login'
+    | '/auth/signup'
+    | '/'
+    | '/meals/new'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/_app/log'
+    | '/_app/meals'
+    | '/_app/profile'
+    | '/_app/progress'
+    | '/auth/login'
+    | '/auth/signup'
+    | '/_app/'
+    | '/_app/meals/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  AuthLoginRoute: typeof AuthLoginRoute
+  AuthSignupRoute: typeof AuthSignupRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/': {
+      id: '/_app/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/auth/signup': {
+      id: '/auth/signup'
+      path: '/auth/signup'
+      fullPath: '/auth/signup'
+      preLoaderRoute: typeof AuthSignupRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/auth/login': {
+      id: '/auth/login'
+      path: '/auth/login'
+      fullPath: '/auth/login'
+      preLoaderRoute: typeof AuthLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/progress': {
+      id: '/_app/progress'
+      path: '/progress'
+      fullPath: '/progress'
+      preLoaderRoute: typeof AppProgressRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/profile': {
+      id: '/_app/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AppProfileRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/meals': {
+      id: '/_app/meals'
+      path: '/meals'
+      fullPath: '/meals'
+      preLoaderRoute: typeof AppMealsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/log': {
+      id: '/_app/log'
+      path: '/log'
+      fullPath: '/log'
+      preLoaderRoute: typeof AppLogRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/meals/new': {
+      id: '/_app/meals/new'
+      path: '/new'
+      fullPath: '/meals/new'
+      preLoaderRoute: typeof AppMealsNewRouteImport
+      parentRoute: typeof AppMealsRoute
     }
   }
 }
 
+interface AppMealsRouteChildren {
+  AppMealsNewRoute: typeof AppMealsNewRoute
+}
+
+const AppMealsRouteChildren: AppMealsRouteChildren = {
+  AppMealsNewRoute: AppMealsNewRoute,
+}
+
+const AppMealsRouteWithChildren = AppMealsRoute._addFileChildren(
+  AppMealsRouteChildren,
+)
+
+interface AppRouteChildren {
+  AppLogRoute: typeof AppLogRoute
+  AppMealsRoute: typeof AppMealsRouteWithChildren
+  AppProfileRoute: typeof AppProfileRoute
+  AppProgressRoute: typeof AppProgressRoute
+  AppIndexRoute: typeof AppIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppLogRoute: AppLogRoute,
+  AppMealsRoute: AppMealsRouteWithChildren,
+  AppProfileRoute: AppProfileRoute,
+  AppProgressRoute: AppProgressRoute,
+  AppIndexRoute: AppIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  AuthLoginRoute: AuthLoginRoute,
+  AuthSignupRoute: AuthSignupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

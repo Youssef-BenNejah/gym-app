@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "foods insertable auth" ON public.foods;

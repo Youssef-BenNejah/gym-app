@@ -1,5 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { Home, UtensilsCrossed, PlusCircle, TrendingUp, User } from "lucide-react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -23,11 +24,24 @@ export function BottomNav() {
               key={t.to}
               to={t.to}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors",
+                "relative flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors",
                 active ? "text-primary" : "text-muted-foreground",
               )}
             >
-              <Icon className={cn("h-6 w-6", active && "stroke-[2.5]")} />
+              {active && (
+                <motion.span
+                  layoutId="nav-active-pill"
+                  className="absolute top-1.5 h-1 w-7 rounded-full bg-primary"
+                  transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                />
+              )}
+              <motion.span
+                className="grid place-items-center"
+                animate={active ? { scale: 1.08 } : { scale: 1 }}
+                transition={{ type: "spring", stiffness: 400, damping: 20 }}
+              >
+                <Icon className={cn("h-6 w-6", active && "stroke-[2.5]")} />
+              </motion.span>
               <span>{t.label}</span>
             </Link>
           );

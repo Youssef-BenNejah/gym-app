@@ -12,4 +12,10 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
+  // Hard-pin the deploy target to Netlify (Netlify Functions handle SSR).
+  // Ignored inside a Lovable cloud build, which always forces Cloudflare —
+  // this only takes effect for local builds and Netlify's own CI.
+  nitro: {
+    preset: "netlify",
+  },
 });

@@ -2,9 +2,13 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
-import { LogOut, Save, User } from "lucide-react";
+import { motion } from "framer-motion";
+import { LogOut, Save, User, Award } from "lucide-react";
 import { toast } from "sonner";
 import { calcTargets } from "@/lib/nutrition";
+import { useBadges } from "@/lib/use-badges";
+import { BadgeGrid } from "@/components/BadgeGrid";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_app/profile")({
@@ -32,7 +36,17 @@ function ProfilePage() {
   const [f, setF] = useState<any>(null);
   useEffect(() => { if (data) setF({ ...data }); }, [data]);
 
-  if (!f) return <div className="p-6">Loading...</div>;
+  const badges = useBadges(f ? {
+    daily_calorie_target: f.daily_calorie_target,
+    daily_protein_target_g: f.daily_protein_target_g,
+    daily_water_target_ml: f.daily_water_target_ml,
+    target_weight_kg: f.target_weight_kg,
+    current_weight_kg: f.current_weight_kg,
+    goal: f.goal,
+  } : null);
+  const earnedCount = badges.filter((b) => b.earned).length;
+
+  if (!f) return <ProfileSkeleton />;
 
   function updateField(k: string, v: any) {
     setF((p: any) => ({ ...p, [k]: v }));
@@ -52,7 +66,7 @@ function ProfilePage() {
     const { id, created_at, email, ...update } = f;
     const { error } = await supabase.from("profiles").update(update).eq("id", id);
     if (error) return toast.error(error.message);
-    toast.success("Profile saved");
+    toast.success("Profile saved", { icon: <Save className="h-4 w-4" /> });
     refetch();
   }
 
@@ -64,7 +78,12 @@ function ProfilePage() {
   const inputCls = "h-11 w-full rounded-xl border border-input bg-card px-4 outline-none focus:border-primary tabular-nums";
 
   return (
-    <div className="px-5 pt-8">
+    <motion.div
+      className="px-5 pt-8 pb-4"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+    >
       <div className="flex items-center gap-3">
         <div className="h-14 w-14 rounded-2xl bg-primary/10 grid place-items-center text-primary">
           <User className="h-6 w-6" />
@@ -74,6 +93,14 @@ function ProfilePage() {
           <div className="text-xs text-muted-foreground">{f.email}</div>
         </div>
       </div>
+
+      <Section title="Achievements" trailing={`${earnedCount}/${badges.length}`}>
+        <div className="flex items-center gap-2 -mt-1 mb-1 text-xs text-muted-foreground">
+          <Award className="h-3.5 w-3.5 text-primary" />
+          Unlock badges by staying consistent with your goals.
+        </div>
+        <BadgeGrid badges={badges} />
+      </Section>
 
       <Section title="You">
         <Row label="Full name">
@@ -86,7 +113,7 @@ function ProfilePage() {
           <div className="grid grid-cols-2 gap-2 rounded-xl bg-muted p-1">
             {["male", "female"].map((g) => (
               <button key={g} onClick={() => updateField("gender", g)}
-                className={cn("h-9 rounded-lg text-sm font-medium capitalize", f.gender === g ? "bg-card shadow-sm" : "text-muted-foreground")}>
+                className={cn("h-9 rounded-lg text-sm font-medium capitalize transition-colors", f.gender === g ? "bg-card shadow-sm" : "text-muted-foreground")}>
                 {g}
               </button>
             ))}
@@ -124,9 +151,9 @@ function ProfilePage() {
             <option value="very_active">Very active</option>
           </select>
         </Row>
-        <button onClick={recalc} className="mt-2 h-11 w-full rounded-xl border border-primary text-primary font-semibold">
+        <motion.button whileTap={{ scale: 0.97 }} onClick={recalc} className="mt-2 h-11 w-full rounded-xl border border-primary text-primary font-semibold">
           Recalculate targets
-        </button>
+        </motion.button>
       </Section>
 
       <Section title="Daily targets">
@@ -141,21 +168,24 @@ function ProfilePage() {
       </Section>
 
       <div className="mt-6 space-y-2">
-        <button onClick={save} className="h-13 w-full rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2" style={{ height: 52 }}>
+        <motion.button whileTap={{ scale: 0.98 }} onClick={save} className="h-13 w-full rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2" style={{ height: 52 }}>
           <Save className="h-4 w-4" /> Save changes
-        </button>
-        <button onClick={signOut} className="h-13 w-full rounded-xl border border-border text-foreground font-medium flex items-center justify-center gap-2" style={{ height: 52 }}>
+        </motion.button>
+        <motion.button whileTap={{ scale: 0.98 }} onClick={signOut} className="h-13 w-full rounded-xl border border-border text-foreground font-medium flex items-center justify-center gap-2" style={{ height: 52 }}>
           <LogOut className="h-4 w-4" /> Sign out
-        </button>
+        </motion.button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, trailing, children }: { title: string; trailing?: string; children: React.ReactNode }) {
   return (
     <section className="mt-6">
-      <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">{title}</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">{title}</h2>
+        {trailing && <span className="text-xs font-semibold text-primary tabular-nums">{trailing}</span>}
+      </div>
       <div className="mt-3 space-y-3">{children}</div>
     </section>
   );
@@ -176,6 +206,30 @@ function TInput({ label, unit, value, onChange }: { label: string; unit: string;
         <input type="number" value={value ?? 0} onChange={(e) => onChange(Number(e.target.value))}
           className="w-24 bg-transparent text-xl font-bold tabular-nums outline-none" />
         <span className="text-xs text-muted-foreground">{unit}</span>
+      </div>
+    </div>
+  );
+}
+
+function ProfileSkeleton() {
+  return (
+    <div className="px-5 pt-8 pb-4">
+      <div className="flex items-center gap-3">
+        <Skeleton className="h-14 w-14 rounded-2xl" />
+        <div className="space-y-2">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-3 w-40" />
+        </div>
+      </div>
+      <div className="mt-6 grid grid-cols-3 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} className="h-24 rounded-2xl" />
+        ))}
+      </div>
+      <div className="mt-6 space-y-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Skeleton key={i} className="h-11 rounded-xl" />
+        ))}
       </div>
     </div>
   );

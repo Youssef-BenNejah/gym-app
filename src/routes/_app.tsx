@@ -1,6 +1,8 @@
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { ensureProfile } from "@/lib/ensure-profile";
 import { BottomNav } from "@/components/BottomNav";
 
 export const Route = createFileRoute("/_app")({
@@ -13,18 +15,25 @@ function AppLayout() {
 
   useEffect(() => {
     let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
+
+    async function handleSession(session: Session | null) {
       if (!mounted) return;
-      if (!data.session) {
+      if (!session) {
         window.location.href = "/auth/login";
-      } else {
-        setAuthed(true);
-        setReady(true);
+        return;
       }
-    });
+      // Guarantees a `profiles` row exists (e.g. recovers accounts left
+      // without one after a failed signup insert or a delayed email
+      // confirmation) before the rest of the app assumes it's there.
+      await ensureProfile();
+      if (!mounted) return;
+      setAuthed(true);
+      setReady(true);
+    }
+
+    supabase.auth.getSession().then(({ data }) => handleSession(data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
-      if (!s) window.location.href = "/auth/login";
-      else setAuthed(true);
+      handleSession(s);
     });
     return () => {
       mounted = false;

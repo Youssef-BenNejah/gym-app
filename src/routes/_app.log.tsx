@@ -2,9 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Plus, UtensilsCrossed, Trash2, Sunrise, Sun, Moon, Cookie, Search } from "lucide-react";
 import { round0, round1, calcFoodNutrition, sumTotals, type Food } from "@/lib/nutrition";
-import { FoodPicker } from "./_app.meals.new";
+import { FoodPicker } from "@/components/FoodPicker";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -57,7 +59,7 @@ function LogPage() {
   const [picking, setPicking] = useState<null | "food" | "saved">(null);
   const [q, setQ] = useState("");
 
-  const { data: log, refetch } = useQuery({
+  const { data: log, isLoading, refetch } = useQuery({
     queryKey: ["daily-log", date],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -83,7 +85,10 @@ function LogPage() {
 
   async function ensureLog(): Promise<{ userId: string; logId: string } | null> {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+    if (!user) {
+      toast.error("Your session expired. Please sign in again.");
+      return null;
+    }
     const { data: existing } = await supabase.from("daily_logs").select("id").eq("user_id", user.id).eq("log_date", date).maybeSingle();
     if (existing) return { userId: user.id, logId: existing.id };
     const { data: created, error } = await supabase.from("daily_logs")
@@ -127,7 +132,7 @@ function LogPage() {
 
   async function removeItem(id: string) {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) return toast.error("Your session expired. Please sign in again.");
     const { error } = await supabase.from("daily_log_meals").delete().eq("id", id);
     if (error) return toast.error(error.message);
     await recalcDailyLog(user.id, date);
@@ -143,7 +148,12 @@ function LogPage() {
   const filteredSaved = (savedMeals ?? []).filter((m) => m.name.toLowerCase().includes(q.toLowerCase()));
 
   return (
-    <div className="px-5 pt-8">
+    <motion.div
+      className="px-5 pt-8"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+    >
       <h1 className="text-2xl font-bold">Log meal</h1>
       <div className="mt-1 text-xs text-muted-foreground">
         {new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}
@@ -153,113 +163,142 @@ function LogPage() {
         {MEAL_TIMES.map(({ key, label, Icon }) => {
           const active = mealTime === key;
           return (
-            <button key={key} onClick={() => setMealTime(key)}
+            <motion.button key={key} whileTap={{ scale: 0.95 }} onClick={() => setMealTime(key)}
               className={cn("rounded-2xl border-2 p-3 flex flex-col items-center gap-1 transition-colors",
                 active ? "border-primary bg-primary/5" : "border-border bg-card")}>
               <Icon className={cn("h-5 w-5", active ? "text-primary" : "text-muted-foreground")} />
               <span className={cn("text-[11px] font-medium", active ? "text-primary" : "text-muted-foreground")}>{label}</span>
-            </button>
+            </motion.button>
           );
         })}
       </div>
 
-      <div className="mt-4 rounded-2xl border border-border bg-card p-4">
-        <div className="grid grid-cols-5 gap-2 text-center text-xs">
-          {[
-            ["Cal", round0(totals.calories)],
-            ["Prot", round0(totals.protein_g) + "g"],
-            ["Carb", round0(totals.carbs_g) + "g"],
-            ["Fat", round0(totals.fat_g) + "g"],
-            ["Fiber", round0(totals.fiber_g) + "g"],
-          ].map(([l, v]) => (
-            <div key={l as string}>
-              <div className="text-muted-foreground">{l}</div>
-              <div className="mt-0.5 text-sm font-semibold tabular-nums">{v}</div>
-            </div>
-          ))}
+      {isLoading ? (
+        <Skeleton className="mt-4 h-16 rounded-2xl" />
+      ) : (
+        <div className="mt-4 rounded-2xl border border-border bg-card p-4">
+          <div className="grid grid-cols-5 gap-2 text-center text-xs">
+            {[
+              ["Cal", round0(totals.calories)],
+              ["Prot", round0(totals.protein_g) + "g"],
+              ["Carb", round0(totals.carbs_g) + "g"],
+              ["Fat", round0(totals.fat_g) + "g"],
+              ["Fiber", round0(totals.fiber_g) + "g"],
+            ].map(([l, v]) => (
+              <div key={l as string}>
+                <div className="text-muted-foreground">{l}</div>
+                <div className="mt-0.5 text-sm font-semibold tabular-nums">{v}</div>
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="mt-5 grid grid-cols-2 gap-2">
-        <button onClick={() => setPicking("food")}
+        <motion.button whileTap={{ scale: 0.97 }} onClick={() => setPicking("food")}
           className="h-12 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-1">
           <Plus className="h-4 w-4" /> Add food
-        </button>
-        <button onClick={() => setPicking("saved")}
+        </motion.button>
+        <motion.button whileTap={{ scale: 0.97 }} onClick={() => setPicking("saved")}
           className="h-12 rounded-xl border border-primary text-primary font-semibold flex items-center justify-center gap-1">
           <UtensilsCrossed className="h-4 w-4" /> Saved meal
-        </button>
+        </motion.button>
       </div>
 
       <div className="mt-5">
         <h2 className="font-semibold capitalize">{mealTime} entries</h2>
         {items.length === 0 ? (
-          <div className="mt-3 rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+          <motion.div
+            key={`empty-${mealTime}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            className="mt-3 rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground"
+          >
             No entries yet for {mealTime}
-          </div>
+          </motion.div>
         ) : (
           <ul className="mt-3 space-y-2">
-            {items.map((it: any) => (
-              <li key={it.id} className="rounded-2xl border border-border bg-card p-3 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{it.meal_name}</div>
-                  <div className="text-xs text-muted-foreground tabular-nums">
-                    {round0(Number(it.calories))} kcal · P {round1(Number(it.protein_g))}g · C {round1(Number(it.carbs_g))}g · F {round1(Number(it.fat_g))}g
+            <AnimatePresence initial={false}>
+              {items.map((it: any) => (
+                <motion.li
+                  key={it.id}
+                  layout
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -24, transition: { duration: 0.2 } }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
+                  className="rounded-2xl border border-border bg-card p-3 flex items-center gap-3"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{it.meal_name}</div>
+                    <div className="text-xs text-muted-foreground tabular-nums">
+                      {round0(Number(it.calories))} kcal · P {round1(Number(it.protein_g))}g · C {round1(Number(it.carbs_g))}g · F {round1(Number(it.fat_g))}g
+                    </div>
                   </div>
-                </div>
-                <button onClick={() => removeItem(it.id)}
-                  className="h-9 w-9 rounded-xl grid place-items-center text-muted-foreground hover:text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </li>
-            ))}
+                  <motion.button whileTap={{ scale: 0.9 }} onClick={() => removeItem(it.id)}
+                    className="h-9 w-9 rounded-xl grid place-items-center text-muted-foreground hover:text-destructive">
+                    <Trash2 className="h-4 w-4" />
+                  </motion.button>
+                </motion.li>
+              ))}
+            </AnimatePresence>
           </ul>
         )}
       </div>
 
-      {picking === "food" && (
-        <FoodPicker onClose={() => setPicking(null)} onPick={(f, q) => { setPicking(null); addFood(f, q); }} />
-      )}
+      <AnimatePresence>
+        {picking === "food" && (
+          <FoodPicker onClose={() => setPicking(null)} onPick={(f, q) => { setPicking(null); addFood(f, q); }} />
+        )}
 
-      {picking === "saved" && (
-        <div className="fixed inset-0 z-50 bg-background flex flex-col">
-          <div className="mx-auto max-w-md w-full flex-1 flex flex-col">
-            <div className="px-5 pt-6 pb-3 border-b border-border flex items-center gap-3">
-              <button onClick={() => setPicking(null)} className="h-10 px-3 rounded-xl border border-border font-medium text-sm">Close</button>
-              <div className="font-semibold">Pick a saved meal</div>
-            </div>
-            <div className="px-5 pt-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search meals..."
-                  className="h-12 w-full rounded-xl border border-input pl-10 pr-4 bg-card outline-none focus:border-primary" />
+        {picking === "saved" && (
+          <motion.div
+            key="saved-picker"
+            className="fixed inset-0 z-50 bg-background flex flex-col"
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+          >
+            <div className="mx-auto max-w-md w-full flex-1 flex flex-col">
+              <div className="px-5 pt-6 pb-3 border-b border-border flex items-center gap-3">
+                <button onClick={() => setPicking(null)} className="h-10 px-3 rounded-xl border border-border font-medium text-sm">Close</button>
+                <div className="font-semibold">Pick a saved meal</div>
               </div>
-            </div>
-            <ul className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
-              {filteredSaved.length === 0 && (
-                <li className="text-center text-sm text-muted-foreground py-10">No saved meals</li>
-              )}
-              {filteredSaved.map((m) => (
-                <li key={m.id}>
-                  <button onClick={() => addSavedMeal(m)}
-                    className="w-full text-left rounded-2xl border border-border bg-card p-4 flex items-center gap-3">
-                    <div className="h-11 w-11 rounded-xl bg-primary/10 text-primary grid place-items-center">
-                      <UtensilsCrossed className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold truncate">{m.name}</div>
-                      <div className="text-xs text-muted-foreground tabular-nums">
-                        {round0(Number(m.total_calories))} kcal · P {round0(Number(m.total_protein_g))}g
+              <div className="px-5 pt-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search meals..."
+                    className="h-12 w-full rounded-xl border border-input pl-10 pr-4 bg-card outline-none focus:border-primary" />
+                </div>
+              </div>
+              <ul className="flex-1 overflow-y-auto px-5 py-3 space-y-2">
+                {filteredSaved.length === 0 && (
+                  <li className="text-center text-sm text-muted-foreground py-10">No saved meals</li>
+                )}
+                {filteredSaved.map((m) => (
+                  <li key={m.id}>
+                    <button onClick={() => addSavedMeal(m)}
+                      className="w-full text-left rounded-2xl border border-border bg-card p-4 flex items-center gap-3 active:scale-[0.99] transition-transform">
+                      <div className="h-11 w-11 rounded-xl bg-primary/10 text-primary grid place-items-center">
+                        <UtensilsCrossed className="h-5 w-5" />
                       </div>
-                    </div>
-                    <Plus className="h-4 w-4 text-primary" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-    </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold truncate">{m.name}</div>
+                        <div className="text-xs text-muted-foreground tabular-nums">
+                          {round0(Number(m.total_calories))} kcal · P {round0(Number(m.total_protein_g))}g
+                        </div>
+                      </div>
+                      <Plus className="h-4 w-4 text-primary" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }

@@ -2,9 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useState } from "react";
-import { Plus, Weight, ArrowDown, ArrowUp } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Plus, Weight, ArrowDown, ArrowUp, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { round1 } from "@/lib/nutrition";
+import { useCountUp } from "@/lib/use-count-up";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/_app/progress")({
   component: ProgressPage,
@@ -25,7 +28,7 @@ function ProgressPage() {
   const [w, setW] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
-  const { data: profile } = useQuery({
+  const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["profile"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -35,7 +38,7 @@ function ProgressPage() {
     },
   });
 
-  const { data: logs, refetch } = useQuery({
+  const { data: logs, isLoading: logsLoading, refetch } = useQuery({
     queryKey: ["weights"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -51,16 +54,23 @@ function ProgressPage() {
     if (!val || val <= 0) return toast.error("Enter a valid weight");
     setSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setSaving(false);
+      return toast.error("Your session expired. Please sign in again.");
+    }
     const { error } = await supabase.from("weight_logs")
       .upsert({ user_id: user.id, logged_at: today(), weight_kg: val }, { onConflict: "user_id,logged_at" });
     if (!error) await supabase.from("profiles").update({ current_weight_kg: val }).eq("id", user.id);
     setSaving(false);
     if (error) return toast.error(error.message);
     setW("");
-    toast.success("Logged");
+    toast.success("Logged", { icon: <Weight className="h-4 w-4" /> });
     refetch();
   }
+
+  const animatedWeight = useCountUp(Number(profile?.current_weight_kg ?? 0));
+
+  if (profileLoading || logsLoading) return <ProgressSkeleton />;
 
   const latest = logs?.[0];
   const start = logs?.[logs.length - 1];
@@ -72,13 +82,21 @@ function ProgressPage() {
   const pad = 0.5;
 
   return (
-    <div className="px-5 pt-8">
+    <motion.div
+      className="px-5 pt-8"
+      initial="hidden"
+      animate="show"
+      variants={{ show: { transition: { staggerChildren: 0.06 } } }}
+    >
       <h1 className="text-2xl font-bold">Progress</h1>
 
-      <section className="mt-5 rounded-3xl bg-primary/5 border border-primary/10 p-5">
+      <motion.section
+        variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
+        className="mt-5 rounded-3xl bg-primary/5 border border-primary/10 p-5"
+      >
         <div className="text-xs font-medium uppercase tracking-wide text-primary">Current weight</div>
         <div className="mt-1 flex items-baseline gap-2">
-          <div className="text-4xl font-bold tabular-nums">{round1(Number(profile?.current_weight_kg ?? 0))}</div>
+          <div className="text-4xl font-bold tabular-nums">{round1(animatedWeight)}</div>
           <div className="text-muted-foreground">kg</div>
         </div>
         <div className="mt-2 flex items-center gap-4 text-xs">
@@ -92,24 +110,30 @@ function ProgressPage() {
             </div>
           )}
         </div>
-      </section>
+      </motion.section>
 
-      <section className="mt-4 rounded-2xl border border-border bg-card p-4">
+      <motion.section
+        variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
+        className="mt-4 rounded-2xl border border-border bg-card p-4"
+      >
         <div className="text-sm font-semibold flex items-center gap-2">
           <Weight className="h-4 w-4 text-primary" /> Log today
         </div>
         <div className="mt-3 flex gap-2">
           <input type="number" step={0.1} placeholder="kg" value={w} onChange={(e) => setW(e.target.value)}
             className="h-12 flex-1 rounded-xl border border-input bg-background px-4 outline-none focus:border-primary tabular-nums" />
-          <button onClick={log} disabled={saving}
+          <motion.button whileTap={{ scale: 0.95 }} onClick={log} disabled={saving}
             className="h-12 px-5 rounded-xl bg-primary text-primary-foreground font-semibold flex items-center gap-1 disabled:opacity-60">
-            <Plus className="h-4 w-4" /> Save
-          </button>
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Save
+          </motion.button>
         </div>
-      </section>
+      </motion.section>
 
       {chartData.length >= 2 && (
-        <section className="mt-4 rounded-2xl border border-border bg-card p-4">
+        <motion.section
+          variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }}
+          className="mt-4 rounded-2xl border border-border bg-card p-4"
+        >
           <div className="text-sm font-semibold">History ({chartData.length})</div>
           <svg viewBox="0 0 300 120" className="mt-3 w-full h-32">
             {(() => {
@@ -124,31 +148,76 @@ function ProgressPage() {
                   {target > 0 && (
                     <line x1={10} x2={290} y1={y(target)} y2={y(target)} stroke="var(--color-primary)" strokeDasharray="3 3" strokeOpacity={0.4} />
                   )}
-                  <path d={path} fill="none" stroke="var(--color-primary)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+                  <motion.path
+                    d={path}
+                    fill="none"
+                    stroke="var(--color-primary)"
+                    strokeWidth={2.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    initial={{ pathLength: 0 }}
+                    animate={{ pathLength: 1 }}
+                    transition={{ duration: 0.9, ease: "easeOut" }}
+                  />
                   {chartData.map((d, i) => (
-                    <circle key={d.id} cx={x(i)} cy={y(Number(d.weight_kg))} r={3} fill="var(--color-primary)" />
+                    <motion.circle
+                      key={d.id}
+                      cx={x(i)}
+                      cy={y(Number(d.weight_kg))}
+                      r={3}
+                      fill="var(--color-primary)"
+                      initial={{ opacity: 0, scale: 0 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.3, delay: 0.6 + i * 0.03 }}
+                    />
                   ))}
                 </>
               );
             })()}
           </svg>
-        </section>
+        </motion.section>
       )}
 
-      <section className="mt-4">
+      <motion.section variants={{ hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } }} className="mt-4">
         <div className="text-sm font-semibold">Entries</div>
         <ul className="mt-2 space-y-1.5">
-          {(logs ?? []).map((l) => (
-            <li key={l.id} className="rounded-xl border border-border bg-card p-3 flex items-center justify-between">
-              <div className="text-sm">{new Date(l.logged_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</div>
-              <div className="font-semibold tabular-nums">{round1(Number(l.weight_kg))} kg</div>
-            </li>
-          ))}
+          <AnimatePresence initial={false}>
+            {(logs ?? []).map((l) => (
+              <motion.li
+                key={l.id}
+                layout
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="rounded-xl border border-border bg-card p-3 flex items-center justify-between"
+              >
+                <div className="text-sm">{new Date(l.logged_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</div>
+                <div className="font-semibold tabular-nums">{round1(Number(l.weight_kg))} kg</div>
+              </motion.li>
+            ))}
+          </AnimatePresence>
           {(!logs || logs.length === 0) && (
             <li className="text-sm text-muted-foreground text-center py-6">No weight entries yet</li>
           )}
         </ul>
-      </section>
+      </motion.section>
+    </motion.div>
+  );
+}
+
+function ProgressSkeleton() {
+  return (
+    <div className="px-5 pt-8">
+      <Skeleton className="h-8 w-32" />
+      <Skeleton className="mt-5 h-28 rounded-3xl" />
+      <Skeleton className="mt-4 h-24 rounded-2xl" />
+      <Skeleton className="mt-4 h-40 rounded-2xl" />
+      <div className="mt-4 space-y-1.5">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 rounded-xl" />
+        ))}
+      </div>
     </div>
   );
 }

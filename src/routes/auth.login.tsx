@@ -20,17 +20,28 @@ function Login() {
   const [pass, setPass] = useState("");
   const [show, setShow] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    const trimmedEmail = email.trim();
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+    const { error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password: pass });
     setLoading(false);
     if (error) {
+      setUnconfirmedEmail(/confirm/i.test(error.message) ? trimmedEmail : null);
       toast.error(error.message);
       return;
     }
+    setUnconfirmedEmail(null);
     nav({ to: "/" });
+  }
+
+  async function resendConfirmation() {
+    if (!unconfirmedEmail) return;
+    const { error } = await supabase.auth.resend({ type: "signup", email: unconfirmedEmail });
+    if (error) toast.error(error.message);
+    else toast.success("Confirmation email sent");
   }
 
   return (
@@ -72,14 +83,26 @@ function Login() {
             type="button"
             className="text-sm text-primary font-medium"
             onClick={async () => {
-              if (!email) return toast.error("Enter your email first");
-              const { error } = await supabase.auth.resetPasswordForEmail(email);
+              const trimmedEmail = email.trim();
+              if (!trimmedEmail) return toast.error("Enter your email first");
+              const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+                redirectTo: `${window.location.origin}/auth/reset-password`,
+              });
               if (error) toast.error(error.message);
               else toast.success("Password reset email sent");
             }}
           >
             Forgot password?
           </button>
+          {unconfirmedEmail && (
+            <button
+              type="button"
+              className="text-sm text-primary font-medium"
+              onClick={resendConfirmation}
+            >
+              Resend confirmation email
+            </button>
+          )}
           <button
             disabled={loading}
             className="mt-2 h-13 min-h-13 w-full rounded-xl bg-primary text-primary-foreground font-semibold flex items-center justify-center gap-2 disabled:opacity-60"

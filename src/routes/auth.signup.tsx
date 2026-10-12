@@ -5,6 +5,8 @@ import { Leaf, Eye, EyeOff, Loader2, ArrowLeft, TrendingDown, TrendingUp, Minus,
 import { toast } from "sonner";
 import { calcTargets, round0 } from "@/lib/nutrition";
 import { cn } from "@/lib/utils";
+import { savePendingProfile } from "@/lib/pending-profile";
+import { ensureProfile } from "@/lib/ensure-profile";
 
 export const Route = createFileRoute("/auth/signup")({
   component: Signup,
@@ -55,7 +57,8 @@ function Signup() {
 
   function next() {
     if (step === 1) {
-      if (!f.full_name || !f.email || !f.password) return toast.error("Fill all fields");
+      if (!f.full_name.trim() || !f.email.trim() || !f.password) return toast.error("Fill all fields");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())) return toast.error("Enter a valid email");
       if (f.password.length < 6) return toast.error("Password must be 6+ characters");
       if (f.password !== f.confirm) return toast.error("Passwords do not match");
     }
@@ -72,22 +75,15 @@ function Signup() {
 
   async function submit() {
     setLoading(true);
+    const email = f.email.trim();
+    const full_name = f.full_name.trim();
     const redirectUrl = `${window.location.origin}/`;
-    const { data, error } = await supabase.auth.signUp({
-      email: f.email, password: f.password,
-      options: { emailRedirectTo: redirectUrl, data: { full_name: f.full_name } },
-    });
-    if (error) {
-      setLoading(false);
-      return toast.error(error.message);
-    }
-    if (!data.user) {
-      setLoading(false);
-      return toast.error("Signup failed");
-    }
-    const { error: pErr } = await supabase.from("profiles").insert({
-      id: data.user.id,
-      full_name: f.full_name, email: f.email,
+
+    // Saved before signUp() so the profile data survives even if email
+    // confirmation is required (no session exists yet to write it to
+    // Supabase) — ensureProfile() picks it up on the next successful login.
+    savePendingProfile({
+      full_name, email,
       age: f.age, gender: f.gender, height_cm: f.height_cm,
       current_weight_kg: f.current_weight_kg,
       target_weight_kg: f.target_weight_kg,
@@ -101,8 +97,36 @@ function Signup() {
       daily_fiber_target_g: f.daily_fiber_target_g,
       daily_water_target_ml: f.daily_water_target_ml,
     });
+
+    const { data, error } = await supabase.auth.signUp({
+      email, password: f.password,
+      options: { emailRedirectTo: redirectUrl, data: { full_name } },
+    });
+    if (error) {
+      setLoading(false);
+      return toast.error(error.message);
+    }
+    if (!data.user) {
+      setLoading(false);
+      return toast.error("Signup failed");
+    }
+
+    if (!data.session) {
+      // Email confirmation is required — there's no session yet, so the
+      // profile can't be written until the user confirms and signs in.
+      setLoading(false);
+      toast.success("Account created! Check your email to confirm it, then sign in.");
+      nav({ to: "/auth/login" });
+      return;
+    }
+
+    const ok = await ensureProfile();
     setLoading(false);
-    if (pErr) return toast.error(pErr.message);
+    if (!ok) {
+      toast.error("Account created, but setup didn't finish. Please sign in to retry.");
+      nav({ to: "/auth/login" });
+      return;
+    }
     toast.success("Account created!");
     nav({ to: "/" });
   }

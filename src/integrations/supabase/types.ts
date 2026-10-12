@@ -230,6 +230,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          source_url: string | null
           total_calories: number | null
           total_carbs_g: number | null
           total_fat_g: number | null
@@ -242,6 +243,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          source_url?: string | null
           total_calories?: number | null
           total_carbs_g?: number | null
           total_fat_g?: number | null
@@ -254,6 +256,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          source_url?: string | null
           total_calories?: number | null
           total_carbs_g?: number | null
           total_fat_g?: number | null
